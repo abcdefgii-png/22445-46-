@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>静默陪伴 Quiet Companion</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'void': '#08080a',
+              'void-light': '#121216',
+              'gold': {
+                100: '#fdf6e3',
+                200: '#ece1be',
+                300: '#dcc692',
+                400: '#dba653',
+                500: '#b8860b', // Dark Goldenrod
+                600: '#9b7008',
+                700: '#75530e',
+                800: '#422f08',
+                900: '#261a04',
+              }
+            },
+            fontFamily: {
+              serif: ['"Noto Serif SC"', '"Songti SC"', 'SimSun', 'serif'],
+              sans: ['"Inter"', 'system-ui', 'sans-serif'],
+            },
+            animation: {
+              'float': 'float 6s ease-in-out infinite',
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'spin-slow': 'spin 12s linear infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      body {
+        background-color: #08080a;
+        color: #ece1be;
+        overflow: hidden; /* App handles scrolling */
+      }
+      /* Hide scrollbar for clean UI */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .card-preserve-3d {
+        transform-style: preserve-3d;
+      }
+      .backface-hidden {
+        backface-visibility: hidden;
+      }
+      .rotate-y-180 {
+        transform: rotateY(180deg);
+      }
+      /* Subtle star dust effect */
+      .stardust {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: white;
+        border-radius: 50%;
+        opacity: 0;
+        animation: twinkle 3s infinite;
+      }
+      @keyframes twinkle {
+        0% { opacity: 0; transform: scale(0.5); }
+        50% { opacity: 0.7; transform: scale(1); }
+        100% { opacity: 0; transform: scale(0.5); }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef, useCallback } = React;
+
+      // --- ICONS (Replaced Lucide imports with inline SVG components for file:// compatibility) ---
+      const IconBase = ({ size = 24, strokeWidth = 1.5, children, ...props }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" {...props}>
+          {children}
+        </svg>
+      );
+
+      const BookOpen = (props) => (
+        <IconBase {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></IconBase>
+      );
+      const Layers = (props) => (
+        <IconBase {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></IconBase>
+      );
+      const Trash2 = (props) => (
+        <IconBase {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>
+      );
+      const Bookmark = ({ fill = "none", ...props }) => (
+        <IconBase fill={fill} {...props}><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></IconBase>
+      );
+      const RefreshCw = (props) => (
+        <IconBase {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></IconBase>
+      );
+      const Smile = (props) => (
+        <IconBase {...props}><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></IconBase>
+      );
+      const Moon = (props) => (
+        <IconBase {...props}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></IconBase>
+      );
+      const Sparkles = (props) => (
+        <IconBase {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 5H5"/><path d="M19 19v4"/><path d="M23 21h-4"/></IconBase>
+      );
+      const X = (props) => (
+        <IconBase {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconBase>
+      );
+      const Grid = (props) => (
+        <IconBase {...props}><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></IconBase>
+      );
+      const List = (props) => (
+        <IconBase {...props}><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></IconBase>
+      );
+      const Activity = (props) => (
+        <IconBase {...props}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></IconBase>
+      );
+
+      // --- CONSTANTS ---
+      const MOODS = ['平静', '焦虑', '低落', '疲惫', '开心', '生气', '迷茫'];
+      const NEEDS = ['需要建议', '需要被哄', '只想被陪着', '想睡个好觉'];
+
+      const CARD_LIBRARY = [
+        { id: 'c01', title: 'The Hermit', tag: '冷静', mainText: '孤独不是被遗弃，而是拥有了完整的自己。', subText: '在这个时刻，外界的声音可以暂时静音。' },
+        { id: 'c02', title: 'Pause', tag: '陪伴', mainText: '停下来并不意味着落后，只是为了确认方向。', subText: '呼吸，感受这一秒的存在。' },
+        { id: 'c03', title: 'The Void', tag: '理性', mainText: '允许混乱存在，它是秩序重组的前奏。', subText: '不要急着去解决所有问题。' },
+        { id: 'c04', title: 'Anchor', tag: '温柔', mainText: '你已经做得很好了，这不是安慰，是事实。', subText: '回头看看你已经走过的路。' },
+        { id: 'c05', title: 'Silence', tag: '陪伴', mainText: '有些答案只有在绝对的安静中才会浮现。', subText: '闭上眼，听听内心的回响。' },
+        { id: 'c06', title: 'Flow', tag: '鼓励', mainText: '顺其自然不是放弃抵抗，而是顺势而为。', subText: '像水一样，柔软但有力量。' },
+        { id: 'c07', title: 'Night', tag: '温柔', mainText: '黑夜是用来修复伤口的，不是用来责备自己的。', subText: '把烦恼交给明天，现在只负责安睡。' },
+        { id: 'c08', title: 'Mirror', tag: '理性', mainText: '你所厌恶的，也许是你压抑的一部分。', subText: '观察它，理解它，然后释放它。' },
+        { id: 'c09', title: 'Distance', tag: '冷静', mainText: '保持距离是保护能量的一种方式。', subText: '你不必对所有期待负责。' },
+        { id: 'c10', title: 'Seed', tag: '鼓励', mainText: '改变往往发生在看不见的土壤之下。', subText: '耐心点，时间会给出答案。' },
+        { id: 'c11', title: 'Boundaries', tag: '理性', mainText: '拒绝并不冷漠，那是对自己最大的尊重。', subText: '你的能量很珍贵，不要随意消耗。' },
+        { id: 'c12', title: 'Moon', tag: '温柔', mainText: '情绪像潮汐，有涨有落是自然的法则。', subText: '不要试图阻挡海浪，学会冲浪。' },
+        { id: 'c13', title: 'Structure', tag: '理性', mainText: '如果你感到失控，试着整理一个抽屉。', subText: '外部的秩序有助于重建内心的秩序。' },
+        { id: 'c14', title: 'Fog', tag: '陪伴', mainText: '看不清路的时候，就只看脚下这一步。', subText: '迷雾终将散去，不要惊慌。' },
+        { id: 'c15', title: 'Fire', tag: '鼓励', mainText: '愤怒是一种燃料，如果你懂得如何转化它。', subText: '让它成为行动的动力，而不是毁灭的火焰。' },
+        { id: 'c16', title: 'Ice', tag: '冷静', mainText: '冷静不是没有感情，而是不被感情吞噬。', subText: '站在旁观者的角度看这场风暴。' },
+        { id: 'c17', title: 'Cycle', tag: '理性', mainText: '低谷是周期的一部分，它不是终点。', subText: '冬天之后，必定是春天。' },
+        { id: 'c18', title: 'Gift', tag: '温柔', mainText: '无论今天发生了什么，感谢自己撑过来了。', subText: '给自己一个拥抱吧。' },
+        { id: 'c19', title: 'Focus', tag: '理性', mainText: '一次只做一件事，一次只想一个问题。', subText: '专注是焦虑的解药。' },
+        { id: 'c20', title: 'Space', tag: '陪伴', mainText: '给自己留一点空白，不要填满每分每秒。', subText: '无所事事也是一种重要的生活方式。' },
+      ];
+
+      const STAR_LIBRARY = [
+        { id: 's01', text: '宇宙接收到了你的信号。' },
+        { id: 's02', text: '这件事已经过去了。' },
+        { id: 's03', text: '你的感受是合理的。' },
+        { id: 's04', text: '允许自己不完美。' },
+        { id: 's05', text: '这一刻，你是安全的。' },
+        { id: 's06', text: '星星在看着你。' },
+        { id: 's07', text: '放下沉重，轻装前行。' },
+        { id: 's08', text: '没什么大不了的。' },
+        { id: 's09', text: '明天又是新的一天。' },
+        { id: 's10', text: '你值得被温柔对待。' },
+        { id: 's11', text: '深呼吸，慢慢来。' },
+        { id: 's12', text: '你的存在本身就有意义。' },
+        { id: 's13', text: '一切都会好起来的。' },
+        { id: 's14', text: '接受无法改变的。' },
+        { id: 's15', text: '你有力量面对一切。' },
+        { id: 's16', text: '做最好的自己就好。' },
+        { id: 's17', text: '不要苛求自己。' },
+        { id: 's18', text: '即使微弱，也是光芒。' },
+        { id: 's19', text: '这里永远接纳你。' },
+        { id: 's20', text: '休息一下吧。' },
+      ];
+
+      const GIFT_LIBRARY = [
+        { id: 'g01', type: 'story', text: '月亮问太阳：“你为什么总是那么耀眼？”太阳说：“因为我从不担心谁会看到我的黑子。”月亮笑了：“那我为什么总是有缺口？”太阳回答：“因为完美太无趣了，你需要留点空间装下星星。”' },
+        { id: 'g02', type: 'joke', text: '今天去买生蚝，老板问要不要开，我说不开，我希望能和它有些交流。' },
+        { id: 'g03', type: 'story', text: '有一只刺猬，它总是觉得自己太扎人了，所以躲在角落里。有一天，一只栗子滚了过来，轻轻碰了碰它。刺猬缩成一团：“别过来，我会扎伤你。”栗子笑了：“没关系，我皮厚。”' },
+        { id: 'g04', type: 'joke', text: '如果你觉得自己很累，想一想细胞为了维持你的生命，每秒钟在进行成千上万次化学反应。它们都没喊累，你... 好吧，你也辛苦了。' },
+      ];
+
+      // --- SERVICES/STORAGE ---
+      const STORAGE_KEY = 'quiet_companion_data_v1';
+      const INITIAL_STATS = {
+        drawCount: 0,
+        trashCount: 0,
+        starsCollected: 0,
+        cardsCollected: [],
+        starsHistory: []
+      };
+
+      const getStats = () => {
+        try {
+          const data = localStorage.getItem(STORAGE_KEY);
+          return data ? JSON.parse(data) : INITIAL_STATS;
+        } catch (e) {
+          return INITIAL_STATS;
+        }
+      };
+
+      const saveStats = (stats) => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+        } catch (e) {
+          console.error('Failed to save stats', e);
+        }
+      };
+
+      const recordDraw = (cardId) => {
+        const stats = getStats();
+        stats.drawCount += 1;
+        saveStats(stats);
+      };
+
+      const recordKeepCard = (cardId) => {
+        const stats = getStats();
+        if (!stats.cardsCollected.includes(cardId)) {
+          stats.cardsCollected.push(cardId);
+          saveStats(stats);
+        }
+      };
+
+      const recordTrash = (star) => {
+        const stats = getStats();
+        stats.trashCount += 1;
+        stats.starsCollected += 1;
+        stats.starsHistory.unshift({ text: star.text, date: Date.now() });
+        saveStats(stats);
+      };
+
+      // --- COMPONENTS ---
+
+      const Layout = ({ children, onOpenGallery, onGoHome, showGalleryButton = true }) => {
+        return (
+          <div className="relative min-h-screen w-full bg-void text-gold-200 overflow-hidden selection:bg-gold-900 selection:text-gold-100 font-sans">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-void-light to-void z-0" />
+            
+            <div className="absolute inset-0 pointer-events-none z-0 opacity-30">
+              <div className="stardust top-1/4 left-1/4 animate-pulse-slow"></div>
+              <div className="stardust top-3/4 left-1/3 animate-pulse-slow delay-700"></div>
+              <div className="stardust top-1/3 right-1/4 animate-pulse-slow delay-1000"></div>
+            </div>
+
+            <header className="absolute top-0 left-0 w-full p-6 z-50 flex justify-between items-start pointer-events-none">
+              <div className="pointer-events-auto cursor-pointer group" onClick={onGoHome}>
+                <h1 className="text-xl md:text-2xl font-serif font-light tracking-widest text-gold-200/90 group-hover:text-gold-100 transition-colors">
+                  静默陪伴 <span className="text-sm opacity-50 block md:inline md:ml-2">Quiet Companion</span>
+                </h1>
+                <p className="text-[10px] md:text-xs text-gold-700 uppercase tracking-[0.2em] mt-1">给今天一个缓冲</p>
+              </div>
+
+              {showGalleryButton && (
+                <button 
+                  onClick={onOpenGallery}
+                  className="pointer-events-auto flex items-center space-x-2 text-gold-600 hover:text-gold-200 transition-colors opacity-80 hover:opacity-100"
+                >
+                  <span className="text-xs tracking-widest hidden md:inline">卡册</span>
+                  <BookOpen size={20} strokeWidth={1.5} />
+                </button>
+              )}
+            </header>
+
+            <main className="relative z-10 w-full h-screen flex flex-col justify-center items-center">
+              {children}
+            </main>
+          </div>
+        );
+      };
+
+      const Home = ({ onSelectMode }) => {
+        return (
+          <div className="w-full max-w-4xl px-6 flex flex-col md:flex-row gap-8 md:gap-16 items-center justify-center animate-float">
+            <button 
+              onClick={() => onSelectMode('DRAW')}
+              className="group relative w-full md:w-80 h-96 border border-gold-900/40 bg-void-light/30 backdrop-blur-sm rounded-sm flex flex-col items-center justify-center transition-all duration-700 hover:border-gold-500/30 hover:bg-gold-900/5"
+            >
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-[radial-gradient(circle_at_center,_rgba(184,134,11,0.05),transparent_70%)]" />
+              
+              <div className="mb-6 text-gold-700 group-hover:text-gold-400 transition-colors duration-500">
+                <Layers size={48} strokeWidth={1} />
+              </div>
+              <h2 className="text-2xl font-serif tracking-widest text-gold-200 group-hover:text-gold-100 transition-colors">抽一张卡</h2>
+              <div className="w-8 h-[1px] bg-gold-800 my-4 group-hover:w-16 transition-all duration-700"></div>
+              <p className="text-xs text-gold-600/70 tracking-widest uppercase">Ritual</p>
+            </button>
+
+            <button 
+              onClick={() => onSelectMode('TRASH')}
+              className="group relative w-full md:w-80 h-96 border border-gold-900/40 bg-void-light/30 backdrop-blur-sm rounded-sm flex flex-col items-center justify-center transition-all duration-700 hover:border-gold-500/30 hover:bg-gold-900/5"
+            >
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-[radial-gradient(circle_at_center,_rgba(184,134,11,0.05),transparent_70%)]" />
+
+              <div className="mb-6 text-gold-700 group-hover:text-gold-400 transition-colors duration-500">
+                <Trash2 size={48} strokeWidth={1} />
+              </div>
+              <h2 className="text-2xl font-serif tracking-widest text-gold-200 group-hover:text-gold-100 transition-colors">扔掉烦恼</h2>
+              <div className="w-8 h-[1px] bg-gold-800 my-4 group-hover:w-16 transition-all duration-700"></div>
+              <p className="text-xs text-gold-600/70 tracking-widest uppercase">Release</p>
+            </button>
+          </div>
+        );
+      };
+
+      const SelfDialogue = ({ onComplete }) => {
+        const [mood, setMood] = useState(null);
+        const [text, setText] = useState('');
+        const [need, setNeed] = useState(null);
+
+        const handleStart = () => {
+          onComplete({ mood, text, need });
+        };
+
+        return (
+          <div className="w-full max-w-md px-6 animate-[fadeIn_1s_ease-out]">
+            <div className="space-y-12">
+              <div className="space-y-4">
+                <label className="block text-xs tracking-[0.2em] text-gold-600 uppercase text-center">此刻的心情</label>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {MOODS.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setMood(m)}
+                      className={`px-4 py-2 text-sm border rounded-full transition-all duration-500 ${
+                        mood === m 
+                          ? 'border-gold-500 text-gold-100 bg-gold-900/20' 
+                          : 'border-gold-900/30 text-gold-600 hover:border-gold-700 hover:text-gold-400'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-xs tracking-[0.2em] text-gold-600 uppercase text-center">今天想说点什么（可选）</label>
+                <div className="relative">
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value.slice(0, 200))}
+                    placeholder="..."
+                    className="w-full h-32 bg-void-light/50 border-b border-gold-900/50 focus:border-gold-500/50 text-gold-200 p-4 resize-none outline-none text-center font-light placeholder-gold-900/50 transition-colors"
+                  />
+                  <span className="absolute bottom-2 right-2 text-[10px] text-gold-800">{text.length}/200</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-xs tracking-[0.2em] text-gold-600 uppercase text-center">倾向（可选）</label>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {NEEDS.map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setNeed(n === need ? null : n)}
+                      className={`px-3 py-1 text-xs border-b transition-all duration-500 ${
+                        need === n
+                          ? 'border-gold-500 text-gold-200' 
+                          : 'border-transparent text-gold-700 hover:text-gold-400'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-8 flex justify-center">
+                <button
+                  onClick={handleStart}
+                  className="px-8 py-3 bg-gold-900/20 border border-gold-700/50 text-gold-200 tracking-[0.3em] hover:bg-gold-900/40 hover:border-gold-500 transition-all duration-700 uppercase text-sm"
+                >
+                  开始抽卡
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      };
+
+      const CardRing = ({ onSelectCard }) => {
+        const containerRef = useRef(null);
+        const [rotation, setRotation] = useState(0);
+        const [isDragging, setIsDragging] = useState(false);
+        const [startX, setStartX] = useState(0);
+        const [startRotation, setStartRotation] = useState(0);
+        const [velocity, setVelocity] = useState(0);
+        const rafRef = useRef();
+        const lastXRef = useRef(0);
+        const lastTimeRef = useRef(0);
+
+        useEffect(() => {
+          const loop = () => {
+            if (!isDragging && Math.abs(velocity) > 0.01) {
+              setRotation(r => r + velocity);
+              setVelocity(v => v * 0.95);
+              rafRef.current = requestAnimationFrame(loop);
+            } else if (!isDragging && Math.abs(velocity) <= 0.01) {
+              setVelocity(0);
+            }
+          };
+          rafRef.current = requestAnimationFrame(loop);
+          return () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+          };
+        }, [isDragging, velocity]);
+
+        const handleStart = (clientX) => {
+          setIsDragging(true);
+          setStartX(clientX);
+          setStartRotation(rotation);
+          lastXRef.current = clientX;
+          lastTimeRef.current = Date.now();
+          setVelocity(0);
+        };
+
+        const handleMove = useCallback((clientX) => {
+          if (!isDragging) return;
+          const deltaX = clientX - startX;
+          setRotation(startRotation + deltaX * 0.5);
+
+          const now = Date.now();
+          const dt = now - lastTimeRef.current;
+          if (dt > 0) {
+            const dx = clientX - lastXRef.current;
+            const v = dx / dt * 8;
+            setVelocity(v);
+            lastXRef.current = clientX;
+            lastTimeRef.current = now;
+          }
+        }, [isDragging, startX, startRotation]);
+
+        const handleEnd = () => {
+          setIsDragging(false);
+        };
+
+        const onMouseDown = (e) => handleStart(e.clientX);
+        const onMouseMove = (e) => handleMove(e.clientX);
+        const onMouseUp = () => handleEnd();
+        const onMouseLeave = () => handleEnd();
+
+        const onTouchStart = (e) => handleStart(e.touches[0].clientX);
+        const onTouchMove = (e) => handleMove(e.touches[0].clientX);
+        const onTouchEnd = () => handleEnd();
+
+        const cards = Array.from({ length: 12 });
+        const radius = 280;
+
+        return (
+          <div 
+            className="relative w-full h-[600px] flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing select-none"
+            ref={containerRef}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseLeave}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+            <div 
+              className="relative w-0 h-0 card-preserve-3d"
+              style={{ perspective: '1200px' }}
+            >
+              <div className="absolute top-1/2 left-1/2 w-0 h-0 card-preserve-3d transition-transform duration-75 ease-out"
+                  style={{ transform: `rotateY(${rotation}deg)` }}>
+                
+                {cards.map((_, i) => {
+                  const angle = (i * 30);
+                  return (
+                    <div
+                      key={i}
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isDragging) onSelectCard(i);
+                      }}
+                      className="absolute top-1/2 left-1/2 w-48 h-72 -ml-24 -mt-36 card-preserve-3d cursor-pointer group hover:scale-105 transition-transform duration-300"
+                      style={{
+                        transform: `rotateY(${angle}deg) translateZ(${radius}px)`,
+                      }}
+                    >
+                      <div className="w-full h-full bg-void border border-gold-800 rounded-lg shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover:shadow-[0_0_15px_rgba(184,134,11,0.2)] group-hover:border-gold-500 transition-all duration-500 flex flex-col items-center justify-center overflow-hidden">
+                        <div className="absolute inset-2 border border-gold-900/50 rounded flex items-center justify-center opacity-50">
+                          <div className="w-24 h-24 border border-gold-900/30 rounded-full rotate-45" />
+                          <div className="absolute w-16 h-16 border border-gold-900/30 rotate-45" />
+                        </div>
+                        <div className="relative w-8 h-8 bg-gold-900/20 rounded-full flex items-center justify-center">
+                          <div className="w-2 h-2 bg-gold-600/50 rounded-full animate-pulse"></div>
+                        </div>
+                        <div className="absolute top-3 left-3 w-1 h-1 bg-gold-800 rounded-full" />
+                        <div className="absolute top-3 right-3 w-1 h-1 bg-gold-800 rounded-full" />
+                        <div className="absolute bottom-3 left-3 w-1 h-1 bg-gold-800 rounded-full" />
+                        <div className="absolute bottom-3 right-3 w-1 h-1 bg-gold-800 rounded-full" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div className="absolute bottom-12 text-gold-800 text-[10px] tracking-[0.3em] uppercase pointer-events-none animate-pulse">
+              Drag to rotate · Click to select
+            </div>
+          </div>
+        );
+      };
+
+      const CardReveal = ({ card, onKeep, onRedraw, onFinished }) => {
+        const [isFlipped, setIsFlipped] = useState(false);
+        const [isSaved, setIsSaved] = useState(false);
+        const [showGiftHint, setShowGiftHint] = useState(false);
+
+        useEffect(() => {
+          const t = setTimeout(() => setIsFlipped(true), 500);
+          return () => clearTimeout(t);
+        }, []);
+
+        useEffect(() => {
+          if (isFlipped) {
+            const t = setTimeout(() => {
+              setShowGiftHint(true);
+              onFinished();
+            }, 3000);
+            return () => clearTimeout(t);
+          }
+        }, [isFlipped, onFinished]);
+
+        const handleKeep = () => {
+          onKeep();
+          setIsSaved(true);
+        };
+
+        return (
+          <div className="relative flex flex-col items-center justify-center h-full w-full">
+            <div className="relative w-72 h-[420px] md:w-80 md:h-[480px] perspective-1000 group">
+              <div 
+                className={`relative w-full h-full duration-1000 transform-style-3d transition-all ${isFlipped ? 'rotate-y-180' : ''}`}
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <div 
+                  className="absolute w-full h-full backface-hidden bg-void border border-gold-800 rounded-xl shadow-2xl flex items-center justify-center"
+                  style={{ backfaceVisibility: 'hidden' }}
+                >
+                  <div className="w-32 h-32 border border-gold-900 rounded-full flex items-center justify-center opacity-30">
+                      <div className="w-20 h-20 border border-gold-800 rotate-45" />
+                  </div>
+                </div>
+
+                <div 
+                  className="absolute w-full h-full backface-hidden rotate-y-180 bg-[#0c0c0f] border border-gold-700/50 rounded-xl shadow-[0_0_30px_rgba(184,134,11,0.1)] p-8 flex flex-col items-center text-center"
+                  style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                >
+                  <div className="w-full flex justify-between items-start mb-12 opacity-80">
+                    <span className="text-[10px] text-gold-600 tracking-[0.2em]">{card.id.toUpperCase()}</span>
+                    <span className="text-[10px] text-gold-600 tracking-[0.2em] uppercase border border-gold-900 px-2 py-0.5 rounded-full">{card.tag}</span>
+                  </div>
+
+                  <div className="flex-1 flex flex-col justify-center items-center">
+                    <h3 className="font-serif text-xl md:text-2xl text-gold-100 leading-relaxed tracking-wide mb-8">
+                      {card.mainText}
+                    </h3>
+                    <p className="text-sm text-gold-600 font-light leading-7 max-w-[80%]">
+                      {card.subText}
+                    </p>
+                  </div>
+
+                  <div className="mt-8 w-2 h-2 rounded-full bg-gold-800/50" />
+                </div>
+              </div>
+            </div>
+
+            <div className={`mt-12 flex space-x-8 transition-opacity duration-1000 ${isFlipped ? 'opacity-100' : 'opacity-0'}`}>
+              <button 
+                onClick={handleKeep}
+                disabled={isSaved}
+                className="flex flex-col items-center space-y-2 group text-gold-600 hover:text-gold-300 transition-colors disabled:opacity-50"
+              >
+                <div className={`p-3 rounded-full border border-gold-900 group-hover:border-gold-500 transition-all ${isSaved ? 'bg-gold-900/30 text-gold-400' : ''}`}>
+                  <Bookmark size={20} fill={isSaved ? "currentColor" : "none"} />
+                </div>
+                <span className="text-[10px] tracking-[0.2em]">{isSaved ? '已收藏' : '收藏'}</span>
+              </button>
+
+              <button 
+                onClick={onRedraw}
+                className="flex flex-col items-center space-y-2 group text-gold-600 hover:text-gold-300 transition-colors"
+              >
+                <div className="p-3 rounded-full border border-gold-900 group-hover:border-gold-500 transition-all">
+                  <RefreshCw size={20} />
+                </div>
+                <span className="text-[10px] tracking-[0.2em]">重抽</span>
+              </button>
+            </div>
+
+            {showGiftHint && (
+              <div className="absolute bottom-4 animate-[fadeIn_2s_ease-out]">
+                <p className="text-[10px] text-gold-800 tracking-widest">
+                  今天，也许还有一份小礼物...
+                </p>
+              </div>
+            )}
+
+          </div>
+        );
+      };
+
+      const GiftReveal = ({ gift, onClose }) => {
+        const [isOpen, setIsOpen] = useState(false);
+
+        if (!isOpen) {
+          return (
+            <button 
+              onClick={() => setIsOpen(true)}
+              className="fixed bottom-12 left-1/2 -translate-x-1/2 px-6 py-2 border border-dashed border-gold-800/50 text-gold-600 text-xs tracking-widest hover:text-gold-300 hover:border-gold-500 transition-all animate-[pulse_3s_infinite]"
+            >
+              打开礼物
+            </button>
+          );
+        }
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]">
+            <div className="relative w-11/12 max-w-md bg-[#1a1a1e] border border-gold-900 p-8 shadow-2xl rounded-sm">
+              <button 
+                onClick={onClose}
+                className="absolute top-4 right-4 text-gold-800 hover:text-gold-500"
+              >
+                ✕
+              </button>
+
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="text-gold-500 opacity-80">
+                  {gift.type === 'story' ? <Moon size={24} /> : <Smile size={24} />}
+                </div>
+                
+                <div className="w-8 h-[1px] bg-gold-800/50"></div>
+
+                <p className="text-gold-200 leading-8 font-light text-sm md:text-base px-4">
+                  {gift.text}
+                </p>
+
+                <div className="pt-4">
+                  <button onClick={onClose} className="text-[10px] text-gold-700 hover:text-gold-400 tracking-[0.2em] uppercase">
+                    收下
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const BinScene = ({ onThrow, onFinish }) => {
+        const [text, setText] = useState('');
+        const [phase, setPhase] = useState('INPUT');
+        const [rewardStar, setRewardStar] = useState(null);
+
+        const handleThrow = () => {
+          if (!text.trim()) return;
+          setPhase('THROWING');
+          
+          setTimeout(() => {
+            setPhase('PROCESSING');
+            const star = onThrow(text);
+            setRewardStar(star);
+          }, 1000);
+        };
+
+        useEffect(() => {
+          if (phase === 'PROCESSING') {
+            const t = setTimeout(() => {
+              setPhase('REWARD');
+            }, 1500);
+            return () => clearTimeout(t);
+          }
+        }, [phase]);
+
+        return (
+          <div className="relative w-full h-full flex flex-col items-center justify-center p-6">
+            
+            <button onClick={onFinish} className="absolute top-6 left-6 text-gold-700 hover:text-gold-400">
+              <X size={24} />
+            </button>
+
+            <div className={`absolute top-20 transition-opacity duration-1000 ${phase === 'INPUT' ? 'opacity-100' : 'opacity-0'}`}>
+              <h2 className="text-xl font-serif text-gold-200 tracking-widest text-center">
+                把烦恼写下来，<br/>然后扔掉。
+              </h2>
+            </div>
+
+            <div 
+              className={`relative z-20 w-full max-w-sm aspect-[3/4] transition-all duration-1000 ease-in-out ${
+                phase === 'THROWING' || phase === 'PROCESSING' || phase === 'REWARD'
+                  ? 'translate-y-[400px] scale-0 opacity-0 rotate-180' 
+                  : 'translate-y-0 scale-100 opacity-100'
+              }`}
+            >
+              <div className="w-full h-full bg-[#fdf6e3] text-gray-800 p-6 shadow-2xl rotate-1">
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value.slice(0, 300))}
+                  placeholder="写下那些让你疲惫的事..."
+                  className="w-full h-full bg-transparent resize-none outline-none font-serif text-lg leading-relaxed placeholder-gray-400"
+                  disabled={phase !== 'INPUT'}
+                />
+                <div className="absolute bottom-4 right-4 text-xs text-gray-400 font-sans">{text.length}/300</div>
+              </div>
+            </div>
+
+            {phase === 'INPUT' && text.length > 0 && (
+              <button
+                onClick={handleThrow}
+                className="absolute bottom-24 z-30 px-8 py-3 bg-gold-900 text-gold-100 tracking-[0.3em] uppercase text-sm border border-gold-600 hover:bg-gold-700 transition-colors shadow-lg animate-[fadeIn_0.5s]"
+              >
+                扔掉
+              </button>
+            )}
+
+            <div className="absolute bottom-0 md:bottom-10 flex flex-col items-center justify-end pointer-events-none">
+              <div className={`w-40 h-4 bg-gold-900 rounded-t-lg mb-1 border-t border-gold-700 transition-transform duration-100 ${
+                phase === 'PROCESSING' ? 'animate-[pulse_0.2s_ease-in-out_infinite]' : ''
+              }`} />
+              
+              <div className="w-32 h-48 bg-gradient-to-b from-void-light to-black border-x border-b border-gold-900/50 rounded-b-lg relative overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#b8860b_10px,#b8860b_11px)]" />
+                  
+                  {phase === 'PROCESSING' && (
+                    <div className="absolute inset-x-0 top-0 h-full flex justify-center">
+                      <div className="w-2 h-2 bg-white rounded-full animate-[float_2s_infinite] opacity-50 blur-sm" />
+                      <div className="w-1 h-1 bg-gold-300 rounded-full animate-[float_3s_infinite_0.5s] opacity-70" />
+                    </div>
+                  )}
+              </div>
+            </div>
+
+            {phase === 'REWARD' && rewardStar && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-40 animate-[fadeIn_1s_ease-out]">
+                
+                <div className="mb-8 relative">
+                  <div className="absolute inset-0 bg-gold-400 blur-xl opacity-40 animate-pulse" />
+                  <Sparkles size={64} className="text-gold-200 animate-[spin-slow_10s_linear_infinite]" />
+                </div>
+
+                <div className="max-w-xs text-center space-y-4">
+                  <p className="text-xs text-gold-500 tracking-[0.2em] uppercase">Universe Message</p>
+                  <h3 className="text-xl md:text-2xl font-serif text-gold-100 leading-normal">
+                    {rewardStar.text}
+                  </h3>
+                </div>
+
+                <button
+                  onClick={onFinish}
+                  className="mt-12 text-xs text-gold-600 hover:text-gold-300 tracking-widest uppercase border-b border-transparent hover:border-gold-500 transition-all"
+                >
+                  收下并离开
+                </button>
+              </div>
+            )}
+
+          </div>
+        );
+      };
+
+      const Gallery = ({ isOpen, onClose, stats }) => {
+        const [tab, setTab] = useState('CARDS');
+        const [selectedCard, setSelectedCard] = useState(null);
+
+        if (!isOpen) return null;
+
+        const collectedCards = CARD_LIBRARY.filter(c => stats.cardsCollected.includes(c.id));
+
+        return (
+          <div className="fixed inset-0 z-[100] flex justify-end">
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+              onClick={onClose}
+            />
+
+            <div className="relative w-full max-w-md h-full bg-[#0c0c0f] border-l border-gold-900/50 shadow-2xl flex flex-col animate-[slideInRight_0.3s_ease-out]">
+              
+              <div className="p-6 flex justify-between items-center border-b border-gold-900/30">
+                <h2 className="text-lg font-serif text-gold-200 tracking-widest">记忆与痕迹</h2>
+                <button onClick={onClose} className="text-gold-700 hover:text-gold-400">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex w-full border-b border-gold-900/30">
+                <button 
+                  onClick={() => setTab('CARDS')}
+                  className={`flex-1 py-4 flex justify-center items-center space-x-2 text-xs tracking-widest transition-colors ${tab === 'CARDS' ? 'text-gold-200 bg-gold-900/10' : 'text-gold-700 hover:text-gold-400'}`}
+                >
+                  <Grid size={16} /> <span>卡牌</span>
+                </button>
+                <button 
+                  onClick={() => setTab('STARS')}
+                  className={`flex-1 py-4 flex justify-center items-center space-x-2 text-xs tracking-widest transition-colors ${tab === 'STARS' ? 'text-gold-200 bg-gold-900/10' : 'text-gold-700 hover:text-gold-400'}`}
+                >
+                  <List size={16} /> <span>星星</span>
+                </button>
+                <button 
+                  onClick={() => setTab('STATS')}
+                  className={`flex-1 py-4 flex justify-center items-center space-x-2 text-xs tracking-widest transition-colors ${tab === 'STATS' ? 'text-gold-200 bg-gold-900/10' : 'text-gold-700 hover:text-gold-400'}`}
+                >
+                  <Activity size={16} /> <span>足迹</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
+                
+                {tab === 'CARDS' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {collectedCards.length === 0 ? (
+                      <div className="col-span-2 text-center text-gold-800 text-sm py-12">
+                        暂无收藏
+                      </div>
+                    ) : (
+                      collectedCards.map(card => (
+                        <button 
+                          key={card.id} 
+                          onClick={() => setSelectedCard(card)}
+                          className="aspect-[2/3] bg-void-light border border-gold-900/50 rounded p-4 flex flex-col justify-between hover:border-gold-500/50 transition-all group"
+                        >
+                          <div className="text-[10px] text-gold-700 text-left">{card.tag}</div>
+                          <div className="text-center">
+                              <div className="text-gold-300 font-serif text-sm mb-2">{card.title}</div>
+                              <div className="w-4 h-[1px] bg-gold-800 mx-auto group-hover:w-8 transition-all" />
+                          </div>
+                          <div className="text-[10px] text-gold-800 text-right">{card.id}</div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {tab === 'STARS' && (
+                  <div className="space-y-4">
+                    {stats.starsHistory.length === 0 ? (
+                      <div className="text-center text-gold-800 text-sm py-12">
+                        还没有收集到星星
+                      </div>
+                    ) : (
+                      stats.starsHistory.map((star, idx) => (
+                        <div key={idx} className="p-4 bg-void-light/50 border border-gold-900/30 rounded flex items-start space-x-3">
+                          <div className="mt-1 w-2 h-2 rounded-full bg-gold-600 shrink-0" />
+                          <div>
+                            <p className="text-gold-300 text-sm font-serif">{star.text}</p>
+                            <p className="text-[10px] text-gold-800 mt-2">{new Date(star.date).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {tab === 'STATS' && (
+                  <div className="space-y-8 py-8">
+                    <div className="text-center">
+                      <div className="text-4xl font-serif text-gold-200 mb-2">{stats.drawCount}</div>
+                      <div className="text-xs text-gold-600 uppercase tracking-widest">抽卡次数</div>
+                    </div>
+                    <div className="w-full h-[1px] bg-gold-900/50" />
+                    <div className="text-center">
+                      <div className="text-4xl font-serif text-gold-200 mb-2">{stats.trashCount}</div>
+                      <div className="text-xs text-gold-600 uppercase tracking-widest">扔掉烦恼</div>
+                    </div>
+                    <div className="w-full h-[1px] bg-gold-900/50" />
+                    <div className="text-center">
+                      <div className="text-4xl font-serif text-gold-200 mb-2">{stats.starsCollected}</div>
+                      <div className="text-xs text-gold-600 uppercase tracking-widest">收集星星</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {selectedCard && (
+              <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-6" onClick={() => setSelectedCard(null)}>
+                <div className="max-w-md w-full bg-[#0c0c0f] border border-gold-600/30 p-8 rounded shadow-2xl relative" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-2xl font-serif text-gold-100 mb-6 text-center">{selectedCard.mainText}</h3>
+                    <p className="text-gold-500 font-light leading-relaxed text-center mb-8">{selectedCard.subText}</p>
+                    <div className="text-center">
+                      <span className="text-xs border border-gold-800 px-2 py-1 rounded-full text-gold-700">{selectedCard.tag}</span>
+                    </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      const App = () => {
+        const [view, setView] = useState('HOME');
+        const [currentCard, setCurrentCard] = useState(null);
+        const [currentGift, setCurrentGift] = useState(null);
+        const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+        const [stats, setStats] = useState(getStats());
+
+        const startDrawFlow = () => {
+          setView('DIALOGUE');
+        };
+
+        const onDialogueComplete = () => {
+          setView('RITUAL');
+        };
+
+        const handleSelectCard = (index) => {
+          const randomIndex = Math.floor(Math.random() * CARD_LIBRARY.length);
+          const selected = CARD_LIBRARY[randomIndex];
+          
+          setCurrentCard(selected);
+          
+          recordDraw(selected.id);
+          refreshStats();
+
+          setView('CARD_REVEAL');
+        };
+
+        const handleKeepCard = () => {
+          if (currentCard) {
+            recordKeepCard(currentCard.id);
+            refreshStats();
+          }
+        };
+
+        const handleRedraw = () => {
+          setView('RITUAL');
+          setCurrentGift(null);
+        };
+
+        const handleCardFinished = () => {
+          if (Math.random() < 0.7) {
+            const randomGift = GIFT_LIBRARY[Math.floor(Math.random() * GIFT_LIBRARY.length)];
+            setCurrentGift(randomGift);
+          }
+        };
+
+        const startTrashFlow = () => {
+          setView('TRASH_BIN');
+        };
+
+        const handleThrowTrash = (text) => {
+          const availableStars = STAR_LIBRARY.filter(s => 
+            !stats.starsHistory.some(h => h.text === s.text)
+          );
+          
+          const pool = availableStars.length > 0 ? availableStars : STAR_LIBRARY;
+          const star = pool[Math.floor(Math.random() * pool.length)];
+          
+          recordTrash(star);
+          refreshStats();
+          return star;
+        };
+
+        const finishTrashFlow = () => {
+          setView('HOME');
+        };
+
+        const refreshStats = () => {
+          setStats(getStats());
+        };
+
+        const goHome = () => {
+          setView('HOME');
+          setCurrentCard(null);
+          setCurrentGift(null);
+        };
+
+        return (
+          <Layout 
+            onOpenGallery={() => setIsGalleryOpen(true)} 
+            onGoHome={goHome}
+            showGalleryButton={view === 'HOME'}
+          >
+            
+            {view === 'HOME' && (
+              <Home onSelectMode={(mode) => mode === 'DRAW' ? startDrawFlow() : startTrashFlow()} />
+            )}
+
+            {view === 'DIALOGUE' && (
+              <SelfDialogue onComplete={onDialogueComplete} />
+            )}
+
+            {view === 'RITUAL' && (
+              <CardRing onSelectCard={handleSelectCard} />
+            )}
+
+            {view === 'CARD_REVEAL' && currentCard && (
+              <React.Fragment>
+                <CardReveal 
+                  card={currentCard} 
+                  onKeep={handleKeepCard} 
+                  onRedraw={handleRedraw}
+                  onFinished={handleCardFinished}
+                />
+                {currentGift && (
+                  <GiftReveal gift={currentGift} onClose={() => setCurrentGift(null)} />
+                )}
+              </React.Fragment>
+            )}
+
+            {view === 'TRASH_BIN' && (
+              <BinScene onThrow={handleThrowTrash} onFinish={finishTrashFlow} />
+            )}
+
+            <Gallery 
+              isOpen={isGalleryOpen} 
+              onClose={() => setIsGalleryOpen(false)} 
+              stats={stats} 
+            />
+            
+          </Layout>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
